@@ -4,10 +4,10 @@ PRISM is an error-controlled lossy compressor that supports progressive data ret
 
 PRISM offers several key features:
 
-1. 🚀 Progressive decompression: a single compressed file natively supports decompression at multiple precision levels.
-2. 🧩Incremental Loading: allows the decompressed data to be incrementally reconstructed during retrieval to satisfy diverse error requirements.
-3. 📊High compression ratio: achieves one of the best compression ratios among state-of-the-art (SOTA) GPU-based lossy compressors for floating-point data.
-4. ⚡ High throughput: delivers 2–19x higher compression/decompression throughput (~100 GB/s) compared to other progressive compressors.
+1. 🚀 **Progressive decompression**: a single compressed file natively supports decompression at multiple precision levels.
+2. 🧩**Incremental Loading**: allows the decompressed data to be incrementally reconstructed during retrieval to satisfy diverse error requirements.
+3. 📊**High compression ratio**: achieves one of the best compression ratios among state-of-the-art (SOTA) GPU-based lossy compressors for floating-point data.
+4. ⚡ **High throughpu**t: delivers **2–19x** higher compression/decompression throughput (~100 GB/s) compared to other progressive compressors.
 
 ## Environment Requirements
 
