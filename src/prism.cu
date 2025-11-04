@@ -109,7 +109,7 @@ void prism_progressive_decompress(prism_context* config, void* stream) {
     output_new->D2H();
 
     if(config->report_time == 1) {
-        print_result<T, 1, 0>(config->size, decmp->total_compressed_size, config->eb, config->rel_eb, 
+        print_result<T, 1, 1>(config->size, decmp->total_compressed_size, config->eb, config->rel_eb, 
             decmp->itime_enum, decmp->itime_pred, decmp->itime_bitplane, decmp->itime_decode);
     }
 
@@ -133,7 +133,7 @@ void prism_progressive_decompress(prism_context* config, void* stream) {
             config->target_ebs[i - 1], stream);
         output_new->D2H();
         if(config->report_time == 1) {
-            print_result<T, 1, 0>(config->size, decmp->total_compressed_size, config->eb, config->rel_eb, 
+            print_result<T, 1, 1>(config->size, decmp->total_compressed_size, config->eb, config->rel_eb, 
                 decmp->itime_enum, decmp->itime_pred, decmp->itime_bitplane, decmp->itime_decode);
         }
         if (config->report_cr == 1) {
