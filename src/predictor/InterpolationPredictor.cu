@@ -1356,9 +1356,9 @@ dim3 anchor_leap, T* xdata_old, T* xdata, T* outlier, FP eb_r, FP ebx2, uint32_t
     __shared__ T shmem_data[AnchorBlockSizeZ * numAnchorBlockZ + (SPLINE_DIM >= 3)]
         [AnchorBlockSizeY * numAnchorBlockY + (SPLINE_DIM >= 2)]
         [AnchorBlockSizeX * numAnchorBlockX + (SPLINE_DIM >= 1)];
-        __shared__ T shmem_ectrl[AnchorBlockSizeZ * numAnchorBlockZ + (SPLINE_DIM >= 3)]
-            [AnchorBlockSizeY * numAnchorBlockY + (SPLINE_DIM >= 2)]
-            [AnchorBlockSizeX * numAnchorBlockX + (SPLINE_DIM >= 1)];
+        // __shared__ T shmem_ectrl[AnchorBlockSizeZ * numAnchorBlockZ + (SPLINE_DIM >= 3)]
+        //     [AnchorBlockSizeY * numAnchorBlockY + (SPLINE_DIM >= 2)]
+        //     [AnchorBlockSizeX * numAnchorBlockX + (SPLINE_DIM >= 1)];
         __shared__ size_t shmem_grid_leaps[LEVEL + 1][2];
         __shared__ size_t shmem_prefix_nums[LEVEL + 1];
     pre_compute<LEVEL>(data_size, shmem_grid_leaps, shmem_prefix_nums);
