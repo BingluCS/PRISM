@@ -11,16 +11,16 @@ struct interpolation_parameters
     double beta{4.0};
     //
     //bool interpolators[3];
-    bool use_md[6];
-    bool use_natural[6];
+    bool use_md[4];
+    bool use_natural[4];
     //
-    bool reverse[6];
+    bool reverse[4];
     uint8_t auto_tuning{3};
 
     //
-    interpolation_parameters() : use_md{true, true, true, true, true, true}, 
-    use_natural{false, false, false, false, false, false},
-    reverse{false, false, false, false, false, false} {}
+    interpolation_parameters() : use_md{true, true, true, true}, 
+    use_natural{false, false, false, false},
+    reverse{false, false, false, false} {}
 };
 
 

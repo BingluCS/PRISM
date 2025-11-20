@@ -52,8 +52,10 @@ void check(prism_context* config) {
         if (config->decFilePath.empty()) {
             if (!config->cmpFilePath.empty())
                 config->decFilePath = config->cmpFilePath + ".out";
-            else 
+            else {
+                config->cmpFilePath = config->oriFilePath + ".prisma";
                 config->decFilePath = config->oriFilePath + ".prisma.out";
+            }
         }
     }
 }
@@ -196,23 +198,23 @@ void parse_argv(prism_context* config, int argc, char** argv) {
         else if (strcmp(argv[i], "-cubic") == 0) {
             if (i + 1 < argc) {
                 if(strcmp(argv[++i], "natural") == 0) 
-                    for(int k = 0; k < 6; ++k)
+                    for(int k = 0; k < 4; ++k)
                         config->intp_param.use_natural[k]=1;
             }
         }
         else if (strcmp(argv[i], "-md") == 0) {
             if (i + 1 < argc) {
                 if(strcmp(argv[i+1], "true") == 0) 
-                    for(int k = 0; k < 6; ++k)
+                    for(int k = 0; k < 4; ++k)
                         config->intp_param.use_md[k]=1;
                 else if (strcmp(argv[i+1], "false") == 0) 
-                    for(int k = 0; k < 6; ++k)
+                    for(int k = 0; k < 4; ++k)
                         config->intp_param.use_md[k]=0;
                 ++i;
             }
         }
         else if (strcmp(argv[i], "-reverse") == 0) {
-            for(int k = 0; k < 6; ++k)
+            for(int k = 0; k < 4; ++k)
                 config->intp_param.reverse[k]=1;
         }
         //test

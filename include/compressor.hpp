@@ -47,6 +47,7 @@ class Compressor {
         inBuffer* qc; // quantization code
         inBuffer* ap; // anchor point
         Buffer* compressed_data;
+        Buffer* profiling_errors;
         olBuffer<T>* ol; // outlier
         // inBuffer* bitplane;
         Bitplane* bp;

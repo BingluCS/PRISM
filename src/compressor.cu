@@ -104,6 +104,7 @@ void Compressor<T,E>::init(prism_context* config) {
     ap = new inBuffer(config->dtype, 0, div(x, BLOCK_SIZE), div(y, BLOCK_SIZE), div(z, BLOCK_SIZE));
     ol = new olBuffer<T>(config->dtype, 0, x, y, z);
     compressed_data = new Buffer(I4, 32, x, y, z);
+    profiling_errors = new Buffer(config->dtype, 0, 18, 1, 1);
     bp = new Bitplane(x, y, z);
     this->begin = config->begin;
     this->end = config->end;
@@ -123,11 +124,14 @@ template<typename T, typename E>
 
 template<typename T, typename E>
 void Compressor<T, E>::compress_merge(context* config, double input_range, void* stream) {
-    total_compressed_size =  compressed_lossless_size + sizeof(double) + 4 * 32 * sizeof(size_t)  + ap->bytes;
-    cudaMemcpyAsync((uint8_t*)compressed_data->d, &input_range, sizeof(double), cudaMemcpyHostToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + sizeof(double), compressedSize_bp_d, 4 * 32 * 8, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 4 * 32 * 8 + sizeof(double), ap->d, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + ap->bytes + 4 * 32 * 8 + sizeof(double), compressed_bp, 
+    total_compressed_size =  8 + compressed_lossless_size + sizeof(double) + 4 * 32 * sizeof(size_t)  + ap->bytes;
+    cudaMemcpyAsync((uint8_t*)compressed_data->d, config->intp_param.use_md, sizeof(config->intp_param.use_md), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync((uint8_t*)compressed_data->d + 4 , config->intp_param.reverse, sizeof(config->intp_param.reverse), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+
+    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8, &input_range, sizeof(double), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + sizeof(double), compressedSize_bp_d, 4 * 32 * 8, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + 4 * 32 * 8 + sizeof(double), ap->d, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + ap->bytes + 4 * 32 * 8 + sizeof(double), compressed_bp, 
     compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
 }
 
@@ -135,7 +139,7 @@ template<typename T, typename E>
 void Compressor<T, E>::compress_predict(context* config, StatBuffer<T>* input, void* stream) {
     double eb = config->eb;
     double rel_eb = config->rel_eb;
-    spline_construct<T,E,T>(input, ap, qc, qc_tmp, ol, eb, rel_eb, radius, config->intp_param, time_pred, stream);
+    spline_construct<T,E,T>(input, ap, qc, qc_tmp, ol, eb, rel_eb, radius, config->intp_param, profiling_errors, time_pred, stream);
 }
 
 template<typename T, typename E>
@@ -184,13 +188,15 @@ void Compressor<T, E>::decompress_scatter(context* config, void* stream) {
     // GPUTimer dtimer;
     // dtimer.start(stream);
     total_compressed_size = compressed_data->bytes;
-    compressed_lossless_size = compressed_data->bytes - sizeof(double) - 4 * 32 * sizeof(size_t);
+    compressed_lossless_size = compressed_data->bytes - sizeof(double) - 4 * 32 * sizeof(size_t) - 8;
     cudaMalloc(&compressed_bp, compressed_lossless_size);
-    cudaMemcpyAsync(&range, (uint8_t*)compressed_data->d, sizeof(double), cudaMemcpyDeviceToHost, (cudaStream_t)stream);
-    cudaMemcpyAsync(compressedSize_bp_d, (uint8_t*)compressed_data->d + sizeof(double), 4 * 32 * sizeof(size_t), cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync(config->intp_param.use_md, (uint8_t*)compressed_data->d, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(config->intp_param.reverse, (uint8_t*)compressed_data->d + 4, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(&range, (uint8_t*)compressed_data->d +8 , sizeof(double), cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressedSize_bp_d, (uint8_t*)compressed_data->d + sizeof(double) + 8, 4 * 32 * sizeof(size_t), cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
     if(init_ap == 1)
-    cudaMemcpyAsync(ap->d, (uint8_t*)compressed_data->d + 4 * 32 * sizeof(size_t) + sizeof(double), ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync(compressed_bp, (uint8_t*)compressed_data->d + ap->bytes + 4 * 32 * sizeof(size_t) + sizeof(double),
+    cudaMemcpyAsync(ap->d, (uint8_t*)compressed_data->d + 4 * 32 * sizeof(size_t) + sizeof(double) + 8, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressed_bp, (uint8_t*)compressed_data->d + ap->bytes + 4 * 32 * sizeof(size_t) + sizeof(double) + 8,
     compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);    
 }
 
