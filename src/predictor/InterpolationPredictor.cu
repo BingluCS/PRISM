@@ -2293,7 +2293,7 @@ uint32_t radius, interpolation_parameters& intp_param, Buffer* profiling_errors,
     GPUTimer dtimer;
     dtimer.start(stream);
     auto_tuning_interpolation<T, FP, 4, SPLINE_DIM_3, BLOCK16, BLOCK16, BLOCK16, 1, 1, 1>
-    <<<dim3(block_num, 9, 1), dim3(DEFAULT_BLOCK_SIZE, 1, 1), 0, (cudaStream_t)stream>>>
+    <<<dim3(block_num, 6, 1), dim3(DEFAULT_BLOCK_SIZE, 1, 1), 0, (cudaStream_t)stream>>>
     (reinterpret_cast<T*>(input->d), input->template len3<dim3>(), input->template st3<dim3>(), 
     dim3(s_start_x, s_start_y, s_start_z), dim3(s_size_x, s_size_y, s_size_z), 
     dim3(S_STRIDE, S_STRIDE, S_STRIDE), eb_r, ebx2, intp_param, reinterpret_cast<T*>(profiling_errors->d), true);
@@ -2344,14 +2344,14 @@ uint32_t radius, interpolation_parameters& intp_param, Buffer* profiling_errors,
     best_error = errors[12];
     best_idx = 12; 
 
-    for(auto i = 12;i<18;i++){
+    for(auto i = 12;i<15;i++){
         if(errors[i]<best_error){
         best_error=errors[i];
         best_idx = i;
         }
     }
     // intp_param.use_natural[0] = best_idx >  14;
-    intp_param.use_md[0] = (best_idx ==  14 or best_idx ==  17);
+    intp_param.use_md[0] = (best_idx ==  14);
     intp_param.reverse[0] = best_idx%3;
 
     dtimer.start(stream);
