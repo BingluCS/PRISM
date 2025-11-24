@@ -26,6 +26,7 @@ void prism_compress(prism_context* config, void* stream) {
         for(int i = 0; i < 1; ++i) {
             cmp_tmp->compress_pipeline(config, input, stream);
         }
+	delete cmp_tmp;
     } // warm up
 
     cmp->init(config);
@@ -36,7 +37,8 @@ void prism_compress(prism_context* config, void* stream) {
         print_result<T, 0, 0>(config->size, cmp->total_compressed_size, config->eb, 
             config->rel_eb, cmp->itime_enum, cmp->time_pred, cmp->time_bitplane, cmp->time_encode);
     }
-
+    delete cmp;
+    delete input;
 }
 
 template<typename T>
@@ -50,6 +52,8 @@ void prism_decompress(prism_context* config, void* stream) {
             decmp_tmp->compressed_data->H2D();
             decmp_tmp->decompress_pipeline(config, output_tmp, stream);
         }
+        delete output_tmp;
+        delete decmp_tmp;
     } // warm up
 
     auto decmp = new prism::Compressor<T,i4>();

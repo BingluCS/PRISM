@@ -68,6 +68,10 @@ Compressor<T,E>::~Compressor() {
     delete qc_tmp;
     // delete bitplane;
     delete bp;
+    delete compressed_data;
+    delete profiling_errors;
+    cudaFree(compressed_bp);
+    cudaFree(compressedSize_bp_d);
 }
 
 template<typename T, typename E>
