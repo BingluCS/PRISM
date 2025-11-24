@@ -51,9 +51,9 @@ void prism_decompress(prism_context* config, void* stream) {
             decmp_tmp->compressed_data->template load_fromfile<cmp_File>(config->cmpFilePath);
             decmp_tmp->compressed_data->H2D();
             decmp_tmp->decompress_pipeline(config, output_tmp, stream);
+            delete decmp_tmp;
+            delete decmp_tmp;
         }
-        delete output_tmp;
-        delete decmp_tmp;
     } // warm up
 
     auto decmp = new prism::Compressor<T,i4>();
