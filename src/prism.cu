@@ -52,7 +52,7 @@ void prism_decompress(prism_context* config, void* stream) {
             decmp_tmp->compressed_data->H2D();
             decmp_tmp->decompress_pipeline(config, output_tmp, stream);
             delete decmp_tmp;
-            delete decmp_tmp;
+            delete output_tmp;
         }
     } // warm up
 
