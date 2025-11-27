@@ -20,7 +20,7 @@ void prism_compress(prism_context* config, void* stream) {
 
     if(config->isComp) {
 
-    if(config->report_time == 2) {
+    if(config->report_time == 1) {
         auto* cmp_tmp = new prism::Compressor<T,i4>();
         cmp_tmp->init(config);
         for(int i = 0; i < 1; ++i) {
@@ -43,7 +43,7 @@ void prism_compress(prism_context* config, void* stream) {
 
 template<typename T>
 void prism_decompress(prism_context* config, void* stream) {
-    if(config->report_time == 2) {
+    if(config->report_time == 1) {
         for(int i = 0; i < 1; ++i) {
             auto output_tmp = new prism::StatBuffer<T>(config->dtype, 0, config->x, config->y, config->z);
             auto decmp_tmp = new prism::Compressor<T,i4>();
@@ -73,6 +73,7 @@ void prism_decompress(prism_context* config, void* stream) {
         input->template load_fromfile<ori_File>(config->oriFilePath);
         statistic<T>(static_cast<T*>(input->h), static_cast<T*>(output_new->h), config->size);
     }
+	delete decmp;
 }
 
 template<typename T>
