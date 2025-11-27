@@ -611,7 +611,7 @@ bool convert_to_bitplane(Buffer* qc, Bitplane* bp, size_t anchor_size, double& t
     GPUTimer dtimer;
     dtimer.start(stream);
     bitShuffle<E,4,bt><<<gridDim, TPB, 0, (cudaStream_t)stream>>>(reinterpret_cast<E*>(qc->d) + anchor_size, 
-    reinterpret_cast<uint8_t*>(bp->data), size, data_size);
+    reinterpret_cast<uint8_t*>(bp->d), size, data_size);
     time = dtimer.stop(stream);
 
     cudaError_t err = cudaGetLastError();
@@ -630,7 +630,7 @@ bool inverse_convert_to_bitplane(Bitplane* bp, Buffer* qc, size_t anchor_size, d
 
     GPUTimer dtimer;
     dtimer.start(stream);
-    inverse_bitShuffle<E,4,bt><<<gridDim, TPB, 0, (cudaStream_t)stream>>>(reinterpret_cast<uint8_t*>(bp->data), 
+    inverse_bitShuffle<E,4,bt><<<gridDim, TPB, 0, (cudaStream_t)stream>>>(reinterpret_cast<uint8_t*>(bp->d), 
     reinterpret_cast<E*>(qc->d) + anchor_size, size, data_size);
     time = dtimer.stop(stream);
 
@@ -655,7 +655,7 @@ int* begin, int* end, double& time, void* stream) {
 
     GPUTimer dtimer;
     dtimer.start(stream);
-    inverse_bitShuffle_progressive<E,4, bt><<<gridDim, TPB, 0, (cudaStream_t)stream>>>(reinterpret_cast<uint8_t*>(bp->data), 
+    inverse_bitShuffle_progressive<E,4, bt><<<gridDim, TPB, 0, (cudaStream_t)stream>>>(reinterpret_cast<uint8_t*>(bp->d), 
     reinterpret_cast<E*>(qc->d) + anchor_size, size, data_size, begin, end);
     time = dtimer.stop(stream);
 

@@ -40,10 +40,11 @@ class Compressor {
         // int splen;
         int radius;
         int align{0};
+        int HEADERSIZE{0};
         double range{1.0};
         double time_pred{0.0}, time_bitplane{0.0}, time_encode{0.0};
         double itime_pred{0.0}, itime_bitplane{0.0}, itime_decode{0.0}, itime_enum{0.0};
-        inBuffer* qc_tmp; // quantization code
+        // inBuffer* qc_tmp; // quantization code
         inBuffer* qc; // quantization code
         inBuffer* ap; // anchor point
         Buffer* compressed_data;

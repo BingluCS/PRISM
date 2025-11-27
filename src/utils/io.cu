@@ -8,7 +8,9 @@
 namespace prism {
 
 Buffer::~Buffer() {
+    if(d)
     cudaFree(d);
+    if(h)
     cudaFreeHost(h);
 }
 
@@ -102,4 +104,26 @@ void Buffer::H2D_cudaasync(void* stream, long long numBytes)
 
 template void Buffer::load_fromfile<ori_File>(const std::string);
 template void Buffer::load_fromfile<cmp_File>(const std::string);
+
+void Bitplane::bitplane_malloc() {
+    calculate_aligned_buffer_size(8);
+
+    cudaMalloc(&aligned_strides_d, sizeof(int) * 4);
+    cudaMalloc(&d, aligned_size);
+    cudaMemset(d, 0, aligned_size);
+    cudaMemcpy(aligned_strides_d, aligned_strides, sizeof(int) * 4, cudaMemcpyHostToDevice);
+}
+
+void Bitplane::calculate_aligned_buffer_size(size_t alignment = 8) {
+    const int LEVEL = 4;
+    const int segments_per_level = 32;
+    aligned_size = 0;
+    
+    for(int level = 0; level < LEVEL; ++level) {
+        size_t segment_size = strides[level];
+        aligned_strides[level] = ((segment_size + alignment - 1) / alignment) * alignment;
+        aligned_size += aligned_strides[level] * segments_per_level;
+    }
+}
+
 }

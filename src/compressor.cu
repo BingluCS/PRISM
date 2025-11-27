@@ -3,7 +3,7 @@
 #include "bitplane.hpp"
 #include "zbpc.hpp"
 #include "dataloader.hpp"
-
+#include <cassert>
 namespace prism{
 
 template <int bytewidth>
@@ -65,12 +65,12 @@ Compressor<T,E>::~Compressor() {
     delete qc;
     delete ap;
     delete ol;
-    delete qc_tmp;
+    // delete qc_tmp;
     // delete bitplane;
     delete bp;
     delete compressed_data;
     delete profiling_errors;
-    cudaFree(compressed_bp);
+    // cudaFree(compressed_bp);
     cudaFree(compressedSize_bp_d);
 }
 
@@ -104,12 +104,13 @@ void Compressor<T,E>::init(prism_context* config) {
         fprintf(stderr, "error quantization code type!");
     }
     qc = new inBuffer(dtype_, 32, x, y, z);
-    qc_tmp = new inBuffer(dtype_, 32, x, y, z);
+    // qc_tmp = new inBuffer(dtype_, 32, x, y, z);
     ap = new inBuffer(config->dtype, 0, div(x, BLOCK_SIZE), div(y, BLOCK_SIZE), div(z, BLOCK_SIZE));
-    ol = new olBuffer<T>(config->dtype, 0, x, y, z);
+    ol = new olBuffer<T>(config->dtype, 0, 0);
     compressed_data = new Buffer(I4, 32, x, y, z);
     profiling_errors = new Buffer(config->dtype, 0, 18, 1, 1);
     bp = new Bitplane(x, y, z);
+    HEADERSIZE = 8 + sizeof(double) + 4 * 32 * sizeof(size_t)  + ap->bytes;
     this->begin = config->begin;
     this->end = config->end;
     cudaMalloc(&compressedSize_bp_d, sizeof(size_t) * 4 * 32);
@@ -119,42 +120,45 @@ void Compressor<T,E>::init(prism_context* config) {
 template<typename T, typename E>
     void Compressor<T, E>::compress_pipeline(context* config, StatBuffer<T>* input, void* stream) {
     compress_predict(config, input, stream);
+    // cudaFree(input->d);
     if(config->bt == SM)
         convert_to_bitplane<E, SM>(qc, bp, ap->len, time_bitplane, stream);
     else convert_to_bitplane<E, NB>(qc, bp, ap->len, time_bitplane, stream);
-    compressed_lossless_size = lossless_encode(bp, compressed_bp, compressedSize_bp_d, input->bytes, time_encode, stream);
+    uint8_t* compressed_ptr = (uint8_t*)compressed_data->d;
+    compressed_lossless_size = lossless_encode(bp, compressed_ptr, compressedSize_bp_d, input->bytes, time_encode, stream);
     compress_merge(config, input->range, stream); 
-}
-
-template<typename T, typename E>
-void Compressor<T, E>::compress_merge(context* config, double input_range, void* stream) {
-    total_compressed_size =  8 + compressed_lossless_size + sizeof(double) + 4 * 32 * sizeof(size_t)  + ap->bytes;
-    cudaMemcpyAsync((uint8_t*)compressed_data->d, config->intp_param.use_md, sizeof(config->intp_param.use_md), cudaMemcpyHostToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 4 , config->intp_param.reverse, sizeof(config->intp_param.reverse), cudaMemcpyHostToDevice, (cudaStream_t)stream);
-
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8, &input_range, sizeof(double), cudaMemcpyHostToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + sizeof(double), compressedSize_bp_d, 4 * 32 * 8, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + 4 * 32 * 8 + sizeof(double), ap->d, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + ap->bytes + 4 * 32 * 8 + sizeof(double), compressed_bp, 
-    compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
 }
 
 template<typename T, typename E>
 void Compressor<T, E>::compress_predict(context* config, StatBuffer<T>* input, void* stream) {
     double eb = config->eb;
     double rel_eb = config->rel_eb;
-    spline_construct<T,E,T>(input, ap, qc, qc_tmp, ol, eb, rel_eb, radius, config->intp_param, profiling_errors, time_pred, stream);
+    spline_construct<T,E,T>(input, ap, qc, bp->d, ol, eb, rel_eb, radius, config->intp_param, profiling_errors, time_pred, stream);
+}
+
+template<typename T, typename E>
+void Compressor<T, E>::compress_merge(context* config, double input_range, void* stream) {
+    total_compressed_size =  compressed_lossless_size + HEADERSIZE;
+    uint8_t* compressed_ptr = (uint8_t*)compressed_data->d + compressed_lossless_size;
+    cudaMemcpyAsync(compressed_ptr, config->intp_param.use_md, sizeof(config->intp_param.use_md), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressed_ptr + 4 , config->intp_param.reverse, sizeof(config->intp_param.reverse), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+
+    cudaMemcpyAsync(compressed_ptr + 8, &input_range, sizeof(double), cudaMemcpyHostToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressed_ptr + 8 + sizeof(double), compressedSize_bp_d, 4 * 32 * 8, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressed_ptr + 8 + 4 * 32 * 8 + sizeof(double), ap->d, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    // cudaMemcpyAsync((uint8_t*)compressed_data->d + 8 + ap->bytes + 4 * 32 * 8 + sizeof(double), compressed_bp, 
+    // compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
 }
 
 template<typename T, typename E>
 void Compressor<T, E>::decompress_pipeline(context* config, StatBuffer<T>* output, void* stream) {
-    if(config->bt == NB)
-        throw std::invalid_argument("Please use progressive mode instead.");
+    assert(config->bt == NB && "please set the non-progressive mode");
     decompress_scatter<1>(config, stream);
     if(config->error_mode == REL) {
         config->eb = config->rel_eb * range;
     }
-    lossless_decode(compressed_bp, bp, output->bytes, itime_decode, stream);
+    uint8_t* compressed_ptr = (uint8_t*)compressed_data->d;
+    lossless_decode(compressed_ptr, bp, output->bytes, itime_decode, stream);
     inverse_convert_to_bitplane<E, SM>(bp, qc, ap->len, itime_bitplane, stream);
     decompress_predict(config, output, stream);
 }
@@ -163,8 +167,7 @@ template<typename T, typename E>
 void Compressor<T, E>::decompress_progressive_pipeline(context* config, StatBuffer<T>* output_old, 
 StatBuffer<T>* output_new, double targetError, double lastError, void* stream) {
     
-    if(config->bt == SM)
-        throw std::invalid_argument("Please use non-progressive mode instead.");
+    assert(config->bt == SM && "please set the progressive mode");
     if(lastError == 0)
         decompress_scatter<1>(config, stream);
     else  decompress_scatter<0>(config, stream);
@@ -172,9 +175,10 @@ StatBuffer<T>* output_new, double targetError, double lastError, void* stream) {
         config->eb = config->rel_eb * range;
         targetError *= range;
     }
-    // printf("%lf %lf %lf\n", targetError, range, config->eb);
+
     findStrategy_h<E>(compressedSize_bp_d, begin, end, config->eb, targetError, itime_enum, stream);
-    lossless_decode_progressive(compressed_bp, bp, output_new->bytes, begin, end, itime_decode, stream);
+     uint8_t* compressed_ptr = (uint8_t*)compressed_data->d;
+    lossless_decode_progressive(compressed_ptr, bp, output_new->bytes, begin, end, itime_decode, stream);
     inverse_convert_to_bitplane_progressive<E, NB>(bp, qc, ap->len, begin, end, itime_bitplane, stream);
     // inverse_convert_to_bitplane<E>(bp, qc, ap->len, itime_bitplane, stream);
     
@@ -192,16 +196,17 @@ void Compressor<T, E>::decompress_scatter(context* config, void* stream) {
     // GPUTimer dtimer;
     // dtimer.start(stream);
     total_compressed_size = compressed_data->bytes;
-    compressed_lossless_size = compressed_data->bytes - sizeof(double) - 4 * 32 * sizeof(size_t) - 8;
-    cudaMalloc(&compressed_bp, compressed_lossless_size);
-    cudaMemcpyAsync(config->intp_param.use_md, (uint8_t*)compressed_data->d, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
-    cudaMemcpyAsync(config->intp_param.reverse, (uint8_t*)compressed_data->d + 4, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
-    cudaMemcpyAsync(&range, (uint8_t*)compressed_data->d +8 , sizeof(double), cudaMemcpyDeviceToHost, (cudaStream_t)stream);
-    cudaMemcpyAsync(compressedSize_bp_d, (uint8_t*)compressed_data->d + sizeof(double) + 8, 4 * 32 * sizeof(size_t), cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+    compressed_lossless_size = compressed_data->bytes - HEADERSIZE;
+    uint8_t* compressed_ptr = (uint8_t*)compressed_data->d + compressed_lossless_size;
+    // cudaMalloc(&compressed_bp, compressed_lossless_size);
+    cudaMemcpyAsync(config->intp_param.use_md, compressed_ptr, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(config->intp_param.reverse, compressed_ptr+ 4, 4, cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(&range, compressed_ptr +8 , sizeof(double), cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+    cudaMemcpyAsync(compressedSize_bp_d, compressed_ptr + sizeof(double) + 8, 4 * 32 * sizeof(size_t), cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
     if(init_ap == 1)
-    cudaMemcpyAsync(ap->d, (uint8_t*)compressed_data->d + 4 * 32 * sizeof(size_t) + sizeof(double) + 8, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
-    cudaMemcpyAsync(compressed_bp, (uint8_t*)compressed_data->d + ap->bytes + 4 * 32 * sizeof(size_t) + sizeof(double) + 8,
-    compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);    
+        cudaMemcpyAsync(ap->d, compressed_ptr + 4 * 32 * sizeof(size_t) + sizeof(double) + 8, ap->bytes, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);
+//     cudaMemcpyAsync(compressed_bp, (uint8_t*)compressed_data->d,
+//     compressed_lossless_size, cudaMemcpyDeviceToDevice, (cudaStream_t)stream);    
 }
 
 template<typename T, typename E>
@@ -209,7 +214,7 @@ void Compressor<T, E>::decompress_predict(context* config, StatBuffer<T>* output
 
     double eb = config->eb;
     double rel_eb = config->rel_eb;
-    spline_reconstruct<T,E,T>(ap, qc, qc_tmp, ol, output, eb, rel_eb, radius, config->intp_param, itime_pred, stream);
+    spline_reconstruct<T,E,T>(ap, qc, bp->d, ol, output, eb, rel_eb, radius, config->intp_param, itime_pred, stream);
 }
 
 template<typename T, typename E>
@@ -217,7 +222,7 @@ void Compressor<T, E>::decompress_progressive_predict(context* config, StatBuffe
 
     double eb = config->eb;
     double rel_eb = config->rel_eb;
-    spline_progressive_reconstruct<T,E,T>(ap, qc, qc_tmp, ol, output_old, output_new, eb, rel_eb, radius, config->intp_param, itime_pred, stream);
+    spline_progressive_reconstruct<T,E,T>(ap, qc, bp->d, ol, output_old, output_new, eb, rel_eb, radius, config->intp_param, itime_pred, stream);
 }
 
 template<typename T>

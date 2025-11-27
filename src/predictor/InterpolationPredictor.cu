@@ -2239,7 +2239,7 @@ dim3 anchor_leap, T* xdata_old, T* xdata, T* outlier, FP eb_r, FP ebx2, uint32_t
 }
 
 template<typename T, typename E, typename FP>
-void spline_construct(StatBuffer<T>* input, Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, olBuffer<T>* outlier, double eb, double rel_eb, 
+void spline_construct(StatBuffer<T>* input, Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, olBuffer<T>* outlier, double eb, double rel_eb, 
 uint32_t radius, interpolation_parameters& intp_param, Buffer* profiling_errors, double& time, void* stream){
     auto div = [](auto _l, auto _subl) { return (_l - 1) / _subl + 1; };
     auto ebx2 = eb * 2;
@@ -2358,7 +2358,7 @@ uint32_t radius, interpolation_parameters& intp_param, Buffer* profiling_errors,
     interpolation<T, E, FP, 4, SPLINE_DIM_3, BLOCK16, BLOCK16, BLOCK16, 1, 1, 1>
     <<<grid_dim, dim3(DEFAULT_BLOCK_SIZE, 1, 1), 0, (cudaStream_t)stream>>>
     (reinterpret_cast<T*>(input->d), input->template len3<dim3>(), input->template st3<dim3>(), reinterpret_cast<E*>(ectrl->d), 
-    reinterpret_cast<E*>(ectrl_tmp->d), reinterpret_cast<T*>(anchor->d), anchor->template st3<dim3>(), 
+    reinterpret_cast<E*>(ectrl_tmp), reinterpret_cast<T*>(anchor->d), anchor->template st3<dim3>(), 
     reinterpret_cast<T*>(outlier->d), outlier->d_idx,
     outlier->d_num, eb_r, ebx2, radius, intp_param);
     time += dtimer.stop(stream);
@@ -2370,7 +2370,7 @@ uint32_t radius, interpolation_parameters& intp_param, Buffer* profiling_errors,
 
 
 template<typename T, typename E, typename FP>
-void spline_reconstruct(Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, olBuffer<T>* outlier, StatBuffer<T>* output, double eb, double rel_eb, 
+void spline_reconstruct(Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, olBuffer<T>* outlier, StatBuffer<T>* output, double eb, double rel_eb, 
 uint32_t radius, interpolation_parameters& intp_param, double& time, void* stream){
     auto div = [](auto _l, auto _subl) { return (_l - 1) / _subl + 1; };
     auto ebx2 = eb * 2;
@@ -2409,19 +2409,19 @@ uint32_t radius, interpolation_parameters& intp_param, double& time, void* strea
     dtimer.start(stream);
     interpolation_reverse<T, E, FP, 4, SPLINE_DIM_3, BLOCK16, BLOCK16, BLOCK16, 1, 1, 1>
     <<<grid_dim, dim3(DEFAULT_BLOCK_SIZE, 1, 1), 0, (cudaStream_t)stream>>>
-    (reinterpret_cast<E*>(ectrl->d), reinterpret_cast<E*>(ectrl_tmp->d), output->template len3<dim3>(), output->template st3<dim3>(), 
+    (reinterpret_cast<E*>(ectrl->d), reinterpret_cast<E*>(ectrl_tmp), output->template len3<dim3>(), output->template st3<dim3>(), 
     reinterpret_cast<T*>(anchor->d), anchor->template len3<dim3>(), anchor->template st3<dim3>(), 
     reinterpret_cast<T*>(output->d), reinterpret_cast<T*>(outlier->d), eb_r, ebx2, radius, intp_param);
 
     time = dtimer.stop(stream);
     cudaError_t err1 = cudaGetLastError();
     if (err1 != cudaSuccess) {
-        printf("CUDA xpredict kernel launch error: %s\n", cudaGetErrorString(err1));
+        printf("CUDA ipredict kernel launch error: %s\n", cudaGetErrorString(err1));
     }
 }
 
 template<typename T, typename E, typename FP>
-void spline_progressive_reconstruct(Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, olBuffer<T>* outlier, StatBuffer<T>* output_old, StatBuffer<T>* output,
+void spline_progressive_reconstruct(Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, olBuffer<T>* outlier, StatBuffer<T>* output_old, StatBuffer<T>* output,
 double eb, double rel_eb,  uint32_t radius, interpolation_parameters& intp_param, double& time, void* stream){
     auto div = [](auto _l, auto _subl) { return (_l - 1) / _subl + 1; };
     auto ebx2 = eb * 2;
@@ -2469,7 +2469,7 @@ double eb, double rel_eb,  uint32_t radius, interpolation_parameters& intp_param
     dtimer.start(stream);
     interpolation_progressive_reverse<T, E, FP, 4, SPLINE_DIM_3, BLOCK16, BLOCK16, BLOCK16, 1, 1, 1>
     <<<grid_dim, dim3(DEFAULT_BLOCK_SIZE, 1, 1), 0, (cudaStream_t)stream>>>
-    (reinterpret_cast<E*>(ectrl->d), reinterpret_cast<E*>(ectrl_tmp->d), output->template len3<dim3>(), 
+    (reinterpret_cast<E*>(ectrl->d), reinterpret_cast<E*>(ectrl_tmp), output->template len3<dim3>(), 
     output->template st3<dim3>(), reinterpret_cast<T*>(anchor->d), 
     anchor->template len3<dim3>(), anchor->template st3<dim3>(), reinterpret_cast<T*>(output_old->d),
     reinterpret_cast<T*>(output->d), reinterpret_cast<T*>(outlier->d), eb_r, ebx2, radius, intp_param);
@@ -2478,19 +2478,19 @@ double eb, double rel_eb,  uint32_t radius, interpolation_parameters& intp_param
 
     cudaError_t err1 = cudaGetLastError();
     if (err1 != cudaSuccess) {
-        printf("CUDA xpredict_pg kernel launch error: %s\n", cudaGetErrorString(err1));
+        printf("CUDA ipredict_prog kernel launch error: %s\n", cudaGetErrorString(err1));
     }
 
 }
 
 #define SPLINE(T, E, FP) \
   template void spline_construct<T, E, FP> (StatBuffer<T> *input, \
-  Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, olBuffer<T>* outlier, double eb, double rel_eb, uint32_t radius, \
+  Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, olBuffer<T>* outlier, double eb, double rel_eb, uint32_t radius, \
   interpolation_parameters& intp_param, Buffer* profiling_errors, double& time, void* stream);\
-  template void spline_reconstruct<T, E, FP> (Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, olBuffer<T>* outlier, \
+  template void spline_reconstruct<T, E, FP> (Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, olBuffer<T>* outlier, \
   StatBuffer<T> *output, double eb, double rel_eb, uint32_t radius, \
   interpolation_parameters& intp_param, double& time, void* stream);\
-  template void spline_progressive_reconstruct<T, E, FP> (Buffer* anchor, Buffer* ectrl, Buffer* ectrl_tmp, \
+  template void spline_progressive_reconstruct<T, E, FP> (Buffer* anchor, Buffer* ectrl, void* ectrl_tmp, \
   olBuffer<T>* outlier, StatBuffer<T> *output_old, StatBuffer<T> *output, double eb, double rel_eb, uint32_t radius, \
   interpolation_parameters& intp_param, double& time, void* stream);
 

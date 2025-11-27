@@ -1,14 +1,10 @@
-
 #pragma once
 
 #include "parameters.hpp"
 #include <fstream>
-#include <iostream>
 #include <cuda_runtime.h>
-#include <vector>
 #include <cstring>
 #include <algorithm>
-#include <array>
 
 void* readData(char* srcFilePath);
 
@@ -76,11 +72,7 @@ typedef struct Buffer {
 
 } inBuffer;
 
-struct Bitplane {
-    // uint8_t** d;
-    // uint8_t** h;
-    uint8_t* data;
-    uint8_t* data_h;
+struct Bitplane : Buffer {
     int* aligned_strides_d;
     uint32_t lx{1}, ly{1}, lz{1};
     size_t len{1}, aligned_len{1};
@@ -95,54 +87,19 @@ struct Bitplane {
         aligned_len = len = lx * ly * lz;
         ori_size = aligned_size = len * 4;
         h_comput<4>();
-        bitplane_malloc<4>();
+        bitplane_malloc();
+        Buffer(U1, 0, aligned_size);
     }
-    ~Bitplane() {
-        // if (d) cudaFree(d);
-        // if (h) cudaFreeHost(h);
-        if (data) cudaFree(data);
-        if (data_h) cudaFree(data_h);
-    }
-    template<int LEVEL>
-    void bitplane_malloc() {
-        aligned_size = calculate_aligned_buffer_size<LEVEL>();
+    // ~Bitplane() {
+    //     // if (d) cudaFree(d);
+    //     // if (h) cudaFreeHost(h);
+    //     if (d) cudaFree(d);
+    //     if (h) cudaFreeHost(h);
+    //     if (aligned_strides_d) cudaFree(aligned_strides_d);
+    // }
+    void bitplane_malloc();
+    void calculate_aligned_buffer_size(size_t alignment);
 
-        // cudaMallocHost(&h, sizeof(uint8_t*) * LEVEL * 32);
-        // cudaMalloc(&d, sizeof(uint8_t*) * LEVEL * 32);
-        cudaMalloc(&aligned_strides_d, sizeof(int) * 4);
-        cudaError_t err = cudaMalloc(&data, aligned_size);
-        cudaMemset(data, 0, aligned_size);
-        // if (err != cudaSuccess) {
-        //     printf("Failed to allocate aligned buffer: %s\n", cudaGetErrorString(err));
-        // }
-
-        // uint8_t* tmp = data;
-        // for(int l = LEVEL - 1; l >= 0; --l) {
-        //     tmp += aligned_strides[l] * 32;
-        //     for(int b = 0; b < 32; ++b) {
-        //         h[l * 32 + b] = tmp + strides[l] * b;
-        //     }
-        // }
-        // for(int i = 0; i < LEVEL; ++i)
-        //     printf("aligned_strides: %d, %d, %d\n", i, aligned_strides[i], strides[i]);
-        // cudaMemcpy(d, h, sizeof(uint8_t*) * LEVEL * 32, cudaMemcpyHostToDevice);
-        cudaMemcpy(aligned_strides_d, aligned_strides, sizeof(int) * 4, cudaMemcpyHostToDevice);
-    }
-
-
-    template<int LEVEL>
-    inline size_t calculate_aligned_buffer_size(size_t alignment = 8) {
-        const int segments_per_level = 32;
-        size_t total_size = 0;
-        
-        for(int level = 0; level < LEVEL; ++level) {
-            size_t segment_size = strides[level];
-            aligned_strides[level] = ((segment_size + alignment - 1) / alignment) * alignment;
-            total_size += aligned_strides[level] * segments_per_level;
-        }
-        
-        return total_size;
-    }
 
     template <int LEVEL> __forceinline__ void h_comput(){
         dim3 d_size = dim3(lx, ly, lz);
@@ -161,31 +118,31 @@ struct Bitplane {
         prefix_nums[3] -=  prefix_nums[3];
 
         for(int i = LEVEL - 2; i >= 0; --i) {
-            align += (8 - ((prefix_nums[i] - prefix_nums[i+1] + align) % 8)) % 8;
+            align += 8 - ((prefix_nums[i] - prefix_nums[i+1] + align) % 8);
             prefix_nums[i] += align;
         }
 
-        align += (8 - ((len - prefix_nums[0] + align) % 8)) % 8;
-
-        strides[3] = (prefix_nums[2] - prefix_nums[3])/ 8;
-        strides[2] = (prefix_nums[1] - prefix_nums[2])/ 8;
-        strides[1] = (prefix_nums[0] - prefix_nums[1])/ 8;
-        strides[0] = (len - prefix_nums[0] + align)/ 8;
+        align += 8 - ((len - prefix_nums[0] + align) % 8);
+        strides[3] = (prefix_nums[2] - prefix_nums[3]) >> 3;
+        strides[2] = (prefix_nums[1] - prefix_nums[2]) >> 3;
+        strides[1] = (prefix_nums[0] - prefix_nums[1]) >> 3;
+        strides[0] = (len - prefix_nums[0] + align) >> 3;
         aligned_len += align;
         
     }
+
     void unload_tofile(const char* filename, typetofile tf) {
         if(tf == typetofile::deviceTofile) {
-            cudaMallocHost((void**)&data_h, aligned_size);
-            CHECK_CUDA(cudaMemcpy(data_h, data, aligned_size, cudaMemcpyDeviceToHost));
+            cudaMallocHost((void**)&h, aligned_size);
+            CHECK_CUDA(cudaMemcpy(h, d, aligned_size, cudaMemcpyDeviceToHost));
         }
-        // std::cout << aligned_size << std::endl;
+
         std::ofstream outfile(filename, std::ios::binary);
         if (!outfile) {
             std::cerr << "can't open file" << std::endl;
             return ;
         }
-        outfile.write(reinterpret_cast<char*>(data_h), aligned_size);
+        outfile.write(reinterpret_cast<char*>(h), aligned_size);
         outfile.close();
     }
 

@@ -475,17 +475,16 @@ void zbpc_decode_progressive(const byte* const __restrict__ input, byte* const _
 
 size_t lossless_encode(Bitplane* bp,  uint8_t*& compressed_bp, size_t*& compressedSize_bp_d, size_t ori_size, double& time, void* stream) {
 
-    // const long long chunks = (bp->aligned_size + CS - 1) / CS;  // round up
     const long long chunks_level[4] = {(bp->strides[0] + CS - 1) / CS << 5, (bp->strides[1] + CS - 1) / CS << 5,
     (bp->strides[2] + CS - 1) / CS << 5, (bp->strides[3] + CS - 1) / CS << 5};
 
     const long long chunks = chunks_level[0] + chunks_level[1] + chunks_level[2] + chunks_level[3];
     
-    const int maxsize = 3 * sizeof(int) + chunks * sizeof(short) + chunks * CS + 7;
+    // const int maxsize = 3 * sizeof(int) + chunks * sizeof(short) + chunks * CS + 7;
     
-    byte* d_encoded;
-    cudaMalloc((void **)&d_encoded, maxsize);
-    cudaMemset(d_encoded, 0, maxsize);
+    // byte* d_encoded;
+    // cudaMalloc((void **)&d_encoded, maxsize);
+    // cudaMemset(d_encoded, 0, maxsize);
     size_t* d_encsize;
     int* d_fullcarry;
     // size_t* compressedSize_bp_d;
@@ -499,7 +498,7 @@ size_t lossless_encode(Bitplane* bp,  uint8_t*& compressed_bp, size_t*& compress
     GPUTimer dtimer;
     dtimer.start(stream);
     zbpc_encode<<<DEFAULT_BLOCK_SIZE, TPB, 0, (cudaStream_t)stream>>>
-    ((uint8_t*)bp->data, bp->aligned_size, d_encoded, d_encsize, bp->aligned_strides_d, compressedSize_bp_d, d_fullcarry);
+    ((uint8_t*)bp->d, bp->aligned_size, compressed_bp, d_encsize, bp->aligned_strides_d, compressedSize_bp_d, d_fullcarry);
     time = dtimer.stop(stream);
 
     // cudaError_t err = cudaGetLastError();
@@ -515,7 +514,7 @@ size_t lossless_encode(Bitplane* bp,  uint8_t*& compressed_bp, size_t*& compress
 
     // Round up size to 8-byte alignment
     dencsize += padding;
-    compressed_bp = d_encoded;
+    // compressed_bp = d_encoded;
 
     return dencsize;
 }
@@ -523,13 +522,13 @@ size_t lossless_encode(Bitplane* bp,  uint8_t*& compressed_bp, size_t*& compress
 
 size_t lossless_decode(uint8_t*& compressed_bp, Bitplane* bp, size_t ori_size, double& time, void* stream) {
 
-    int pre_size;
+    // int pre_size;
     uint8_t* input = compressed_bp;
-    void** output = (void**)(&bp->data);
-    cudaMemcpy(&pre_size, input, sizeof(long long), cudaMemcpyDeviceToHost);
+    // void** output = (void**)(&bp->d);
+    // cudaMemcpy(&pre_size, input, sizeof(long long), cudaMemcpyDeviceToHost);
 
-    byte* d_decoded;
-    cudaMalloc((void **)&d_decoded, pre_size);
+    // byte* d_decoded;
+    // cudaMalloc((void **)&d_decoded, pre_size);
     int* d_decsize;
     cudaMalloc((void **)&d_decsize, sizeof(int));
     
@@ -546,30 +545,30 @@ size_t lossless_decode(uint8_t*& compressed_bp, Bitplane* bp, size_t ori_size, d
     GPUTimer dtimer;
     dtimer.start(stream);
     d_reset<<<1, 1>>>();
-    zbpc_decode<<<DEFAULT_BLOCK_SIZE, TPB, 0, (cudaStream_t)stream>>>(input, d_decoded, d_decsize, bp->aligned_strides_d);
+    zbpc_decode<<<DEFAULT_BLOCK_SIZE, TPB, 0, (cudaStream_t)stream>>>(input, reinterpret_cast<uint8_t*>(bp->d), d_decsize, bp->aligned_strides_d);
     time = dtimer.stop(stream);
 
-    // cudaError_t err = cudaGetLastError();
-    // if (err != cudaSuccess) {
-    //     printf("CUDA decode kernel launch error: %s\n", cudaGetErrorString(err));
-    // }
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA decode kernel launch error: %s\n", cudaGetErrorString(err));
+    }
     
-    *output = d_decoded;
+    // *output = d_decoded;
     return 0;
 }
 
 size_t lossless_decode_progressive(uint8_t*& compressed_bp, Bitplane* bp, size_t ori_size, int* begin, int* end,
 double& time, void* stream) {
 
-    int pre_size;
+    // int pre_size;
     uint8_t* input = compressed_bp;
-    void** output = (void**)(&bp->data);
-    cudaMemcpy(&pre_size, input, sizeof(long long), cudaMemcpyDeviceToHost);
+    // void** output = (void**)(&bp->d);
+    // cudaMemcpy(&pre_size, input, sizeof(long long), cudaMemcpyDeviceToHost);
 
     // CheckCuda(__LINE__);
-    byte* d_decoded;
-    cudaMalloc((void **)&d_decoded, pre_size);
-    cudaMemset(d_decoded, 0, pre_size);
+    // byte* d_decoded;
+    // cudaMalloc((void **)&d_decoded, pre_size);
+    // cudaMemset(d_decoded, 0, pre_size);
     long long* d_decsize;
     cudaMalloc((void **)&d_decsize, sizeof(long long));
     // CheckCuda(__LINE__);
@@ -587,13 +586,14 @@ double& time, void* stream) {
     GPUTimer dtimer;
     dtimer.start(stream);
     d_reset<<<1, 1>>>();
-    zbpc_decode_progressive<<<DEFAULT_BLOCK_SIZE, TPB, 0, (cudaStream_t)stream>>>(input, d_decoded, d_decsize, bp->aligned_strides_d, begin, end);
+    zbpc_decode_progressive<<<DEFAULT_BLOCK_SIZE, TPB, 0, (cudaStream_t)stream>>>(input, reinterpret_cast<uint8_t*>(bp->d), 
+    d_decsize, bp->aligned_strides_d, begin, end);
     time = dtimer.stop(stream);
 
-    // cudaError_t err = cudaGetLastError();
-    // if (err != cudaSuccess) {
-    //     printf("CUDA progressive decode kernel launch error: %s\n", cudaGetErrorString(err));
-    // }
-    *output = d_decoded;
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA progressive decode kernel launch error: %s\n", cudaGetErrorString(err));
+    }
+    // *output = d_decoded;
     return 0;
 }

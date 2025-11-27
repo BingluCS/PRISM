@@ -1,9 +1,7 @@
 #include "parameters.hpp"
 #include "stdint.h"
-#include <stdexcept>  
 #include <string>  
 #include <stdlib.h>
-#include <cstring> 
 #include <iostream>
 #include <sstream>
 #include <cuda_runtime.h>
@@ -46,7 +44,7 @@ void check(prism_context* config) {
         if (config->cmpFilePath.empty())
             config->cmpFilePath = config->oriFilePath + ".prisma";
     }
-    if(config->isDecomp == 1) {
+    if (config->isDecomp == 1) {
         if (config->oriFilePath.empty() && config->cmpFilePath.empty())
             throw std::invalid_argument("compressed file path must be specified.");
         if (config->decFilePath.empty()) {
@@ -58,6 +56,10 @@ void check(prism_context* config) {
             }
         }
     }
+    if (!config->isComp && !config->isDecomp) {
+        printf("Please set the compression/decompression\n");
+        usage();
+    } 
 }
 
 void parse_argv(prism_context* config, int argc, char** argv) {
