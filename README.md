@@ -9,6 +9,12 @@ PRISM offers several key features:
 3. 📊**High compression ratio**: achieves one of the best compression ratios among state-of-the-art (SOTA) GPU-based lossy compressors for floating-point data.
 4. ⚡ **High throughpu**t: delivers **2–19x** higher compression/decompression throughput (~100 GB/s) compared to other progressive compressors.
 
+(C) 2025 by Institute of Computing Technology, Chinese Academy of Sciences.
+
+**Developers**: Bing Lu, Zedong Liu
+
+**Contributors**: Dingwen Tao (Supervisor), Guangming Tan
+
 ## Environment Requirements
 
 - Linux OS with NVIDIA GPUs
@@ -69,3 +75,17 @@ Example Commands:
   ```
   ./prism -i Miranda/density.d64 -d -3 384 384 256 -R 1E-6 -z -x -prog -errors -5 1e-2 1e-3 1e-4 1e-5 1e-6 --report time,cr
   ```
+
+## Citation
+
+If you use **PRISM** in your research or software, please cite our work:
+
+```
+@inproceedings{lu2026prism,
+  title={PRISM: An Efficient GPU-Based Lossy Compression Framework for Progressive Data Retrieval with Multi-Level Interpolation},
+  author={Lu, Bing and Liu, Zedong and Zhao, Hairui and Luo, Dejun and Huang, Wenjing and Gu, Yida and Liu, Jinyang and Tan, Guangming and Tao, Dingwen},
+  booktitle={Proceedings of the 31st {ACM} {SIGPLAN} Annual Symposium on Principles and Practice of Parallel Programming, PPoPP 2026, Sydney, Australia, January 31-February 4, 2026},
+  year={2026},
+  DOI={}
+}
+```
